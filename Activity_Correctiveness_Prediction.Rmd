@@ -1,0 +1,92 @@
+---
+title: 'Coursera Project: Machine Learning'
+author: "Deepak"
+date: "May 29, 2016"
+output: html_document
+---
+
+#Executive Summary
+* **Subject Matter:**  In this project, goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and build a prediction model that accurately tells how well they do it. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+* **Model Used For Prediction:** Since our goal is prediction and that requires high accuracy, because if someone performing the exercise badly and our outcome says he/she not then it leads to injury. Random forest statistical learning method is used for this task as it provide high accuracy with less interpretability.
+
+##Model Building Exercise Using Random Forest
+
+
+###Step 1:  Loading Necessary R packages
+
+
+```{r packages,cache=TRUE,results='hide'}
+
+library(caret) 
+library(tree)
+library(randomForest)
+
+Activity<-read.csv("pml-training.csv",header = T) ##Loading Training Data
+final_test<-read.csv("pml-testing.csv",header = T) ##Loading Test Data
+
+```
+
+###Step 2:  Performing Data Cleaning And Creating Data Partition
+
+
+```{r DataCleaning, cache=TRUE,results='hide'}
+
+selcols<-grep("^((gyros)|(accel)|(magnet)|(roll)|(pitch)|(yaw))",names(Activity)) 
+
+Activity_F<-Activity[,selcols] ##Selecting the columns With Non=NAs 
+
+Activity_F$classe<-Activity$classe ##Adding Class Variable
+
+train<-createDataPartition(Activity_F$classe,p=0.7,list = F) ##Creating Index For data partition
+Activity_train<-Activity_F[train,]
+Activity_test<-Activity_F[-train,]
+
+
+```
+
+###Step 3:  Performing Cross Validation To Identify Optimum number of Variables With Low Test Error. As you can notice in the below plot, 6 predictors can be used in our Final Model that has low CV error
+
+
+```{r cv, cache=TRUE}
+
+activity.cv<-rfcv(Activity_train[,-49],Activity_train[,49])
+
+plot(activity.cv$n.var,activity.cv$error.cv,xlab = "No. Of Variable",
+     ylab = "Misclassification Rate",main = "Cross Validation Output",type = "b")
+
+```
+
+###Step 4:  First we train our model with all predictors and see which variables are most important, we also look at the OOB error and Other Parameters
+
+```{r model1, cache=TRUE}
+
+forest.ac<-randomForest(classe~.,data = Activity_train,importance = T)
+forest.ac
+
+top6<-importance(forest.ac, sort = TRUE)
+top6<-top6[order(top6, decreasing=TRUE),drop = FALSE]
+top6[1:6,drop = FALSE]
+varImpPlot(forest.ac,sort = TRUE)
+
+```
+
+###Step 5:  Now we train our final model using top 6 variables and also evaluate the model on the test data to check the accuracy
+
+```{r model2, cache=TRUE}
+
+Activity_train6<-Activity_train[,grep("^((roll_belt)|(yaw_belt)|(pitch_forearm)|(magnet_dumbbell_z)|(magnet_dumbbell_y)|(pitch_belt))",names(Activity_train))]
+Activity_train6$classe<-Activity_train$classe
+
+
+forest.acfinal<-randomForest(classe~.,data = Activity_train6)
+forest.pred<-predict(forest.acfinal,newdata = Activity_test,type = "class")
+confusionMatrix(forest.pred,Activity_test$classe)
+
+forest.pred1<-predict(forest.acfinal,newdata = final_test,type = "class")
+forest.pred1 ##Predictions On Final Test data with 20 responses using final trimmed model 
+
+
+```
+
+ 
